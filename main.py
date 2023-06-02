@@ -15,7 +15,7 @@ class_names = ['Ayam Goreng Tepung', 'Baju', 'Bakso', 'Celana', 'Dompet',
 app = Flask(__name__)
 
 # Load The Model
-model = load_model('D:\Capstone Project\Model\inceptionv3_image_classifier_v3.h5')
+model = load_model('model/model.h5')
 
 @app.route('/predict', methods=['POST'])
 def predictions():
