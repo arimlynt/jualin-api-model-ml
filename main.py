@@ -1,9 +1,11 @@
 import numpy as np
-import os
 from tensorflow.keras.models import load_model
 from tensorflow.keras.preprocessing import image
 from tensorflow.keras.applications.inception_v3 import preprocess_input
 from flask import Flask, jsonify, request
+import os
+from google.cloud import storage
+import io
 
 # Define Class Names
 class_names = ['Ayam Goreng Tepung', 'Baju', 'Bakso', 'Celana', 'Dompet',
@@ -17,14 +19,17 @@ app = Flask(__name__)
 # Load The Model
 model = load_model('model/model.h5')
 
+# Configure Google Cloud Storage
+os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = "service-account-key.json"
+storage_client = storage.Client()
+bucket_name = 'api-model-ml'  # Ganti dengan nama bucket Anda
+
 @app.route('/predict', methods=['POST'])
 def predictions():
     file = request.files['imagefile']
-    file_path = "./images/" + file.filename
-    file.save(file_path)
     
     try:
-        img = image.load_img(file_path, target_size=(224,224))
+        img = image.load_img(io.BytesIO(file.stream.read()), target_size=(224,224))
         img = image.img_to_array(img)
         img = np.expand_dims(img, axis=0)
         img = preprocess_input(img)
@@ -34,7 +39,16 @@ def predictions():
         classes = int(pred.argmax(axis=-1))
         result = class_names[classes]
 
-        os.remove(file_path)
+        # Upload image to Google Cloud Storage
+        bucket = storage_client.bucket(bucket_name)
+
+        # Hapus foto lama jika ada
+        if bucket.blob(file.filename).exists():
+            bucket.blob(file.filename).delete()
+
+        blob = bucket.blob(file.filename)
+        file_data = file.read()
+        blob.upload_from_string(file_data, content_type=file.content_type)
 
         return jsonify(str(result))
     except Exception as e:
